@@ -1,0 +1,199 @@
+
+
+#RNA-seq ANALYSIS
+#CARRIED OUT IN R UNLESS OTHERWISE NOTED
+
+library(DESeq2)
+library(readr)
+library(AnnotationDbi)
+library(org.Mm.eg.db)
+library(pcaExplorer)
+library(RColorBrewer)
+library(pheatmap)
+library(tidyverse)
+library(ggplot2)
+library(biomaRt)
+library(dplyr)
+library(factoextra)
+library(NbClust)
+library(tidyverse)
+library(annotables)
+
+set.seed(725)
+
+####RNA-SEQ read mapping and counting was conducted by Novogene, Inc. Raw read counts and FPKM were provided to investigators.
+
+####RNA-SEQ DIFFERENTIAL EXPRESSION
+#Differential expression was performed on raw read counts in R with DESeq2 (v3.12) using the Wald test with betaPrior=FALSE and lfcShrink type=”apeglm” 
+#For pairwise comparisons, only WT and relevant knockout genotype were used to generate DESeq Dataset (DDS)
+
+##Example workflow: Cpt2/WT comparison
+ctsCpt <- as.matrix(read.csv("rna_readcount_cpt.csv",row.names="geneID"))
+coldataCpt <- read.csv("readcount_coldata_cpt.csv", row.names=1) #column data file created in Excel
+rownames(coldataCpt) <- colnames(ctsCpt)
+all(rownames(coldataCpt) == colnames(ctsCpt)) #confirm column data and count file fields align before proceeding
+
+ddsCpt <- DESeqDataSetFromMatrix(countData = ctsCpt,
+                              colData = coldataCpt,
+                              design = ~ genotype)
+ddsCpt$genotype <- factor(ddsCpt$genotype, 
+                       levels = c("wt","cpt2"))
+
+ddsCpt <- DESeq(ddsCpt, test=c("Wald"), betaPrior = FALSE) 
+ddsCpt <- ddsCpt[ rowSums(counts(ddsCpt)) > 1, ] #genes w/ minimum 1 count
+
+resCpt <- results(ddsCpt, contrast=c("genotype","cpt2","wt"), lfcThreshold = 0) 
+resCpt <- lfcShrink(ddsCpt, coef=2, type="apeglm", res=resCpt) 
+
+ensembl <- useDataset("mmusculus_gene_ensembl", mart=ensembl)
+filterType <- "ensembl_gene_id"
+filterValues <- rownames(resCpt)
+
+View(listAttributes(ensembl)) #add gene annotations using ENSEMBL
+attributeNames <- c('ensembl_gene_id','external_gene_name', 'description', 'gene_biotype') 
+
+annotCpt <- getBM(attributes=attributeNames, 
+               filters = filterType, 
+               values = filterValues, 
+               mart = ensembl)
+
+resCpt_df <- as.data.frame(resCpt) %>% rownames_to_column("GeneID")
+resCpt_out <- left_join(resCpt_df, annotCpt, by=c("GeneID" = "ensembl_gene_id"))
+
+write.csv(resCpt_out, file=“DifferentialExpression_Cpt2-WT.csv")
+
+##filtering for log fold change and padj value done in Excel. Data visualized in Graphpad Prism 9.
+
+
+####RNA-SEQ COUNT VALUES & PCA PLOT
+#For downstream analysis, including PCA and clustering, read counts for all samples were used to generate a single DDS
+
+cts <- as.matrix(read.csv("rna_readcount.csv",row.names="geneID"))
+coldata <- read.csv("readcount_coldata.csv", row.names=1)
+rownames(coldata) <- colnames(cts)
+all(rownames(coldata) == colnames(cts))
+dds <- DESeqDataSetFromMatrix(countData = cts,
+                              colData = coldata,
+                              design = ~ genotype)
+dds$genotype <- factor(dds$genotype, 
+                       levels = c("wt","cpt2","ppar","dko"))
+
+dds <- DESeq(dds, test=c("Wald"), betaPrior = FALSE)
+dds <- dds[ rowSums(counts(dds)) > 1, ]
+
+##output normalized read counts for use in gene count plots
+normCounts <- as.data.frame((counts(dds, normalized=TRUE)))
+filterType <- "ensembl_gene_id"
+filterValues <- rownames(normCounts)
+attributeNames <- c('ensembl_gene_id','external_gene_name', 'description', 'gene_biotype') 
+annotCount <- getBM(attributes=attributeNames, 
+                  filters = filterType, 
+                  values = filterValues, 
+                  mart = ensembl)
+resCount_df <- as.data.frame(normCounts) %>% rownames_to_column("GeneID")
+normCounts_annotated <- left_join(resCount_df, annot, by=c("GeneID" = "ensembl_gene_id"))
+
+write.csv(normCounts_annotated, file="deseq_normalized_counts.csv")
+
+##Gene counts visualized in Graphpad Prism 9
+
+##apply rlog transformation to DDS for PCA and clustering
+dds_rlog <- rlog(dds, blind=FALSE)
+
+##PCA plot 
+pcaplot(dds_rlog, intgroup="genotype", 
+        text_labels = FALSE, point_size = 2,
+        ellipse = TRUE, ellipse.prob = 0.9)
+
+
+####RNA-SEQ CLUSTERING & TRACING
+
+##Construct DDS significance matrix
+#use the pairwise KO/WT comparisons to generate significance filter ('sigFilter') list of significant genes (fold change => 2, padj < 0.05)
+#use ‘sigFilter’ to pull rlog values from the DDS generated with all samples
+
+rlogMatrix <- as.data.frame(assay(dds_rlog))
+rlogMatrix <- rownames_to_column(rlogMatrix)
+sigMat <- left_join(sigFilter, rlogMatrix, by=c("geneID" = "rowname"))
+
+#convert ensembl IDs to gene symbols
+filterType <- "ensembl_gene_id"
+filterValues <- sigMat$geneID
+attributeNames <- c('ensembl_gene_id','external_gene_name') 
+annotsig <- getBM(attributes=attributeNames, 
+                  filters = filterType, 
+                  values = filterValues, 
+                  mart = ensembl)
+sigMat <- left_join(sigMat, annotsig, by=c("geneID" = "ensembl_gene_id"))
+rownames(sigMat) <- sigMat$external_gene_name
+sigMat$external_gene_name <- NULL
+sigMat$geneID <- NULL
+
+sigMat <- as.matrix(sigMat) #significance matrix for clustering
+
+##use gap statistic to determine optimal kmeans cluster number (I determined 4-6 for this dataset)
+fviz_nbclust(sigMat, FUNcluster = kmeans, method=c("gap_stat"), k.max = 10, nboot=500) +
+  labs(subtitle = "kmeans estimate all samples- Gap statistic")
+
+##Clustering & Heatmap
+k_clust <- pheatmap(sigMat, color = heatcol, scale="row", kmeans_k=5, cluster_cols=FALSE)
+
+kclustList <- k_clust$kmeans$cluster
+write.csv(kclustList, file= "kclusterList_k5.csv") #list of cluster genes
+
+colnames(kclustDF) <- "Cluster"
+kclustDF[1:5,,drop=FALSE]
+OrderByCluster <- sigMat[order(kclustDF$Cluster),]
+
+annoRowK <- data.frame(factor(k_clust$kmeans$cluster))
+rownames(annoRowK) <- rownames(sigMat)
+
+k_clust_heatmap <- pheatmap(OrderByCluster, 
+                             color = heatcol,
+                             scale="row",
+                             cluster_cols = FALSE,
+                             cluster_rows = FALSE,
+                             gaps_col=c(4,8,12),
+                             annotation_row = annoRowK,
+                             show_colnames = TRUE,
+                             show_rownames = FALSE,
+                             filename = "kclust5.png")
+
+##Cluster tracings
+scale_rows = function(x){
+  m = apply(x, 1, mean, na.rm = T)
+  s = apply(x, 1, sd, na.rm = T)
+  return((x - m) / s) }
+
+data <- as.data.frame(sigMat)
+rowscale <- scale_rows(data[,-1]) #scales the sigMat to match pheatmap calculations
+data <- cbind(data[,1], rowscale)
+
+kmeans_out <- k_clust$kmeans
+data_with_cust_info <- data %>% 
+  mutate(clust = paste("clust_", kmeans_out$cluster,sep = ""))
+
+data_with_cust_info %>% 
+  gather(key = "variable" , value = "value", -c(1,18)) %>%     
+  group_by(variable) %>%  
+  mutate(row_num =  1:n()) %>% 
+  ggplot(aes(x =  variable , y = value , group = row_num)) +
+  ylim(-3,4) +
+  #geom_point(size=0.5) +                                     
+  geom_line(colour="grey", linetype=13, size=0.2) +          
+  geom_abline(aes(intercept=0, slope=0, color="black")) +
+  geom_abline(aes(intercept=1, slope=0, color="black")) +
+  geom_abline(aes(intercept=2, slope=0, color="black")) +
+  geom_abline(aes(intercept=3, slope=0, color="black")) +
+  geom_abline(aes(intercept=-1, slope=0, color="black")) +
+  geom_abline(aes(intercept=-2, slope=0, color="black")) +
+  geom_abline(aes(intercept=-3, slope=0, color="black")) +
+  geom_abline(aes(intercept=4, slope=0, color="black")) +
+  stat_summary(fun.y=mean, aes(group=1), geom="line", colour="blue", size=0.6) +
+  theme_bw() +  
+  theme(legend.position = "none" , axis.text.x = element_text(angle = 90 , vjust = 0.4)) +
+  facet_grid(~clust)
+
+
+
+
