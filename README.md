@@ -7,7 +7,8 @@ RNA-seq data found at: GSE165701
 ATAC-seq and ChIP-seq data found at: GSE179053
 
 
-1. RNA-seq: differential expression and clustering
-2. ATAC-seq: 
-3. ChIP-seq: differential peak analysis
-4. Enhancer analysis: genomic arithmetic, aggregation plots, heatmaps
+
+1. RNA-seq (Fig 1, Fig 3)
+2. ATAC-seq (Fig 2, Fig x) 
+3. ChIP-seq:
+4. Enhancer analysis (Fig 7)
