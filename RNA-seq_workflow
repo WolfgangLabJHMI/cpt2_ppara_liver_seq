@@ -1,7 +1,7 @@
 
 
 #RNA-seq ANALYSIS
-#CARRIED OUT IN R UNLESS OTHERWISE NOTED
+#CARRIED OUT IN R
 
 library(DESeq2)
 library(readr)
