@@ -3,6 +3,7 @@ Workflows used to analyze seq data in "Ppar⍺ and fatty acid oxidation coordina
 doi: xxxxxxxx
 
 RNA-seq data found at: GSE165701
+
 ATAC-seq and ChIP-seq data found at: GSE179053
 
 
