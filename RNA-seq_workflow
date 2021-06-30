@@ -138,6 +138,8 @@ fviz_nbclust(sigMat, FUNcluster = kmeans, method=c("gap_stat"), k.max = 10, nboo
 ##Clustering & Heatmap
 k_clust <- pheatmap(sigMat, color = heatcol, scale="row", kmeans_k=5, cluster_cols=FALSE)
 
+#note scale="row" ellicits Z-score row scaling
+
 kclustList <- k_clust$kmeans$cluster
 write.csv(kclustList, file= "kclusterList_k5.csv") #list of cluster genes
 
