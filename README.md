@@ -6,8 +6,6 @@ RNA-seq data found at: GSE165701
 
 ATAC-seq and ChIP-seq data found at: GSE179053
 
-note to self: include #ATAC-seq / ChIP-seq enhancer analysis found in separate section
-
 1. RNA-seq: (Fig 1, Fig 2, Fig 3, Fig 4)
 2. ATAC-seq: (Fig 2, Fig 5) 
 3. ChIP-seq: (Fig 1, Fig 6)
