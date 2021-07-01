@@ -1,7 +1,9 @@
 
-
 #RNA-seq ANALYSIS
-#CARRIED OUT IN R
+
+#RNA-SEQ read mapping and counting was conducted by Novogene, Inc. Raw read counts and FPKM were provided to investigators.
+#Carried out in R unless otherwise noted
+
 
 library(DESeq2)
 library(readr)
@@ -21,11 +23,11 @@ library(annotables)
 
 set.seed(725)
 
-####RNA-SEQ read mapping and counting was conducted by Novogene, Inc. Raw read counts and FPKM were provided to investigators.
 
-####RNA-SEQ DIFFERENTIAL EXPRESSION
+###RNA-SEQ DIFFERENTIAL EXPRESSION
 #Differential expression was performed on raw read counts in R with DESeq2 (v3.12) using the Wald test with betaPrior=FALSE and lfcShrink type=”apeglm” 
 #For pairwise comparisons, only WT and relevant knockout genotype were used to generate DESeq Dataset (DDS)
+
 
 ##Example workflow: Cpt2/WT comparison
 ctsCpt <- as.matrix(read.csv("rna_readcount_cpt.csv",row.names="geneID"))
@@ -61,11 +63,11 @@ resCpt_df <- as.data.frame(resCpt) %>% rownames_to_column("GeneID")
 resCpt_out <- left_join(resCpt_df, annotCpt, by=c("GeneID" = "ensembl_gene_id"))
 
 write.csv(resCpt_out, file=“DifferentialExpression_Cpt2-WT.csv")
+#filtering for log fold change and padj value done in Excel. Data visualized in Graphpad Prism 9.
 
-##filtering for log fold change and padj value done in Excel. Data visualized in Graphpad Prism 9.
 
 
-####RNA-SEQ COUNT VALUES & PCA PLOT
+###RNA-SEQ COUNT VALUES & PCA PLOT
 #For downstream analysis, including PCA and clustering, read counts for all samples were used to generate a single DDS
 
 cts <- as.matrix(read.csv("rna_readcount.csv",row.names="geneID"))
@@ -81,6 +83,7 @@ dds$genotype <- factor(dds$genotype,
 dds <- DESeq(dds, test=c("Wald"), betaPrior = FALSE)
 dds <- dds[ rowSums(counts(dds)) > 1, ]
 
+
 ##output normalized read counts for use in gene count plots
 normCounts <- as.data.frame((counts(dds, normalized=TRUE)))
 filterType <- "ensembl_gene_id"
@@ -94,11 +97,12 @@ resCount_df <- as.data.frame(normCounts) %>% rownames_to_column("GeneID")
 normCounts_annotated <- left_join(resCount_df, annot, by=c("GeneID" = "ensembl_gene_id"))
 
 write.csv(normCounts_annotated, file="deseq_normalized_counts.csv")
+#Gene counts visualized in Graphpad Prism 9
 
-##Gene counts visualized in Graphpad Prism 9
 
 ##apply rlog transformation to DDS for PCA and clustering
 dds_rlog <- rlog(dds, blind=FALSE)
+
 
 ##PCA plot 
 pcaplot(dds_rlog, intgroup="genotype", 
@@ -106,12 +110,13 @@ pcaplot(dds_rlog, intgroup="genotype",
         ellipse = TRUE, ellipse.prob = 0.9)
 
 
-####RNA-SEQ CLUSTERING & TRACING
+###RNA-SEQ CLUSTERING & TRACING
 
 ##Construct DDS significance matrix
-#use the pairwise KO/WT comparisons to generate significance filter ('sigFilter') list of significant genes (fold change => 2, padj < 0.05)
+#use the pairwise KO/WT comparisons to generate ‘sigFilter’ list of significant genes (fold change => 2, padj < 0.05)
 #use ‘sigFilter’ to pull rlog values from the DDS generated with all samples
 
+sigFilter <- as.data.frame(read.csv("sigFilter_05.csv"))
 rlogMatrix <- as.data.frame(assay(dds_rlog))
 rlogMatrix <- rownames_to_column(rlogMatrix)
 sigMat <- left_join(sigFilter, rlogMatrix, by=c("geneID" = "rowname"))
@@ -131,14 +136,14 @@ sigMat$geneID <- NULL
 
 sigMat <- as.matrix(sigMat) #significance matrix for clustering
 
+
 ##use gap statistic to determine optimal kmeans cluster number (I determined 4-6 for this dataset)
 fviz_nbclust(sigMat, FUNcluster = kmeans, method=c("gap_stat"), k.max = 10, nboot=500) +
   labs(subtitle = "kmeans estimate all samples- Gap statistic")
 
+
 ##Clustering & Heatmap
 k_clust <- pheatmap(sigMat, color = heatcol, scale="row", kmeans_k=5, cluster_cols=FALSE)
-
-#note scale="row" ellicits Z-score row scaling
 
 kclustList <- k_clust$kmeans$cluster
 write.csv(kclustList, file= "kclusterList_k5.csv") #list of cluster genes
@@ -160,6 +165,7 @@ k_clust_heatmap <- pheatmap(OrderByCluster,
                              show_colnames = TRUE,
                              show_rownames = FALSE,
                              filename = "kclust5.png")
+
 
 ##Cluster tracings
 scale_rows = function(x){
@@ -195,7 +201,6 @@ data_with_cust_info %>%
   theme_bw() +  
   theme(legend.position = "none" , axis.text.x = element_text(angle = 90 , vjust = 0.4)) +
   facet_grid(~clust)
-
 
 
 
