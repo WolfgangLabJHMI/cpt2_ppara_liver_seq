@@ -16,7 +16,9 @@ library(org.Mm.eg.db)
 library(TxDb.Mmusculus.UCSC.mm10.knownGene)
 set.seed(725)
 
+
 ##Use Diffbind to load in peakset, normalize, and count reads in intervals
+
 samples <- read_csv("diffbind_samplesheet.csv") 
 
 dba_atac <- dba(sampleSheet=samples,
@@ -57,7 +59,9 @@ normlibs <- cbind(FullLibSize=norm$lib.sizes, NormFacs=norm$norm.factors,
 rownames(normlibs) <- info$ID
 normlibs
 
+
 ##create RangedSummarizedExperiment for DESeq2 differential analysis
+
 rangedCounts <- dba.peakset(dba_atac, score=DBA_SCORE_READS, bRetrieve=TRUE)
 counts <- as.matrix(mcols(rangedCounts))
 rowRanges<-GRanges(rangedCounts)
@@ -74,6 +78,7 @@ rownames(atacSumExp) <- npeaks
 
 
 ##pass RangeSummarizedExperiment to DESeq2 for differential peak analysis
+
 ddsATAC <- DESeqDataSet(atacSumExp, design = ~genotype)
 ddsATAC$genotype <- factor(ddsATAC$genotype, 
                            levels = c("wt","cpt2","ppar","dko"))
@@ -83,6 +88,13 @@ ddsATAC <- DESeq(ddsATAC,
                  betaPrior= TRUE)
 ddsATAC <- ddsATAC[ rowSums(counts(ddsATAC)) > 1, ]
 
+#call result reports
+res1 <- results(ddsATAC, contrast=c("genotype","cpt2","wt"), 
+                alpha=0.05, lfcThreshold = 1, format = "GRanges")
+res2 <- results(ddsATAC, contrast=c("genotype","ppar","wt"), 
+                alpha=0.05, lfcThreshold = 1, format = "GRanges")
+res3 <- results(ddsATAC, contrast=c("genotype","dko","wt"),
+                alpha=0.05, lfcThreshold = 1, format = "GRanges")
 
 #rlog transformation for downstream visualization
 atac_rlog <- rlog(ddsATAC, blind=TRUE)
@@ -98,9 +110,11 @@ pcaplot(atac_rlog, intgroup="genotype",
 dba.plotMA(diffBAnalyze, contrast=1, th=0.05, fold=1, bFlip = TRUE, bSignificant = TRUE, bSmooth = TRUE)
 
 
+
 ###ADDITONAL ATAC PEAKSET PROCESSING IN R
 
 ##export dba.peakset as GRanges in BED format
+
 allPeaks <- rowRanges 
 peakGr <- data.frame(seqnames=seqnames(allPeaks),
                      starts=start(allPeaks)-1,
@@ -116,8 +130,9 @@ write.table(peakGr, file="allPeaks.bed",
 
 
 ##Pull out ATAC promoter peaks associated with unregulated Cpt2(L-/-)/WT transcripts
+
 #ATAC peak sequences for promoters (atacProm_ID.csv) obtained from Active Motif peak annotation file
-#Unregulated transcripts (cpt2_fc2_genes.csv) obtained from DESeq2 output
+#Upregulated transcript IDs (cpt2_fc2_genes.csv) obtained from RNA-seq DESeq2 output
 atacProm_ID <- read_csv("atacProm_ID.csv")
 
 cpt_up <- read.csv("cpt2_fc2_genes.csv")
@@ -151,8 +166,6 @@ clust2 <- subset(clustAll, cluster==2)
 clust3 <- subset(clustAll, cluster==3)
 clust4 <- subset(clustAll, cluster==4)
 clust5 <- subset(clustAll, cluster==5)
-
-
 
 clust1peak <- semi_join(atacProm_ID, clust1, by="symbol")
 clust2peak <- semi_join(atacProm_ID, clust2, by="symbol")
@@ -263,6 +276,7 @@ makeTagDirectory CPT2_ATAC_tagDirectory/ -update -genome mm10 -checkGC -fragLeng
 makeTagDirectory PPARA_ATAC_tagDirectory/ -update -genome mm10 -checkGC -fragLength 200 
 makeTagDirectory DKO_ATAC_tagDirectory/ -update -genome mm10 -checkGC -fragLength 200
 
+
 ##Aggregation Plots
 
 #All ATAC peaks
@@ -270,6 +284,7 @@ annotatePeaks.pl ATAC_allMergedRegions.bed mm10 -size 10000 -hist 10 -d WT_ATAC_
 
 #Genebodies
 makeMetaGeneProfile.pl rna mm10 -gbin 300 -bin 100 -d WT_ATAC_tagDirectory/ CPT2_ATAC_tagDirectory/ PPARA_ATAC_tagDirectory/ DKO_ATAC_tagDirectory/ -norm 38300000 > atac_metageneProfile.txt
+
 
 ##Motif Analysis
 
@@ -279,5 +294,5 @@ findMotifsGenome.pl cpt_fc2_promotors.txt mm10 cpt2_fc2 -size 500
 #For cluster 1 and cluster 3 promoters
 
 findMotifsGenome.pl clust1peaks.txt mm10 cluster_1 -size 500
-indMotifsGenome.pl clust1peaks.txt mm10 cluster_3 -size 500
+findMotifsGenome.pl clust1peaks.txt mm10 cluster_3 -size 500
 
