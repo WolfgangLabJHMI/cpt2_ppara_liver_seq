@@ -1,0 +1,240 @@
+ENHANCER ANALYSIS
+
+
+###DEFINE ENHANCERS USING H3K4me1 & H3K27ac ChIP-seq
+
+#enhancer coordinates filtered from genebodies with +/2kb flank
+#1) enhancer set initially defined as H3K4me1 within paramaters
+#2) active enhancer defined first [1] by H3K4me1 x H3K27ac
+
+#downloaded .bed files for UCSC refSeq (refGene)
+mm10_geneCoordinates.bed
+mm10_2kbUpstream.bed
+mm10_2kbDownstream.bed
+
+#sorted all files for merge/intersect. 
+sort -k 1,1 -k2,2n mm10_geneCoordinates.bed > mm10_geneCoordinates_sort.bed
+sort -k 1,1 -k2,2n mm10_2kbUpstream.bed > mm10_2kbUpstream_sort.bed
+sort -k 1,1 -k2,2n mm10_2kbDownstream.bed > mm10_2kbDownstream_sort.bed
+
+sort -k 1,1 -k2,2n k4_allMergedRegions.bed > k4_allMergedRegions_sort.bed
+sort -k 1,1 -k2,2n k27_allMergedRegions.bed > k27_allMergedRegions_sort.bed
+
+#remove ENCODE black list from seq coordinates:
+bedtools intersect -a k4_allMergedRegions_sort.bed -b mm10blacklist_ENCFF547MET.bed -v > k4_allMergedRegions_sortFiltered.bed
+bedtools intersect -a k27_allMergedRegions_sort.bed -b mm10blacklist_ENCFF547MET.bed -v > k27_allMergedRegions_sortFiltered.bed
+
+#1) enhancer set initially defined as H3K4me1 within paramaters
+bedtools intersect -a k4_allMergedRegions_sortFiltered.bed -b mm10_geneCoordinates_sort.bed -v > k4_noGeneBodies.bed
+bedtools intersect -a k4_noGeneBodies.bed -b mm10_2kbUpstream.bed -v > k4_noGeneBodies_Upstream.bed
+bedtools intersect -a k4_noGeneBodies_Upstream.bed -b mm10_2kbDownstream.bed -v > k4_allPotentialEnhancers.bed
+
+#2) active enhancer defined first [1] by H3K4me1 x H3K27ac. Overlap must be =>50% of K27 interval. Don't use reciprocal ratio because K4 peaks are more broad than than K27 overall
+bedtools intersect -a k4_allPotentialEnhancers.bed -b k27_allMergedRegions.bed -F 0.5 -wa > k4xk27_enhancerSet.bed
+
+##Final active enhancer list
+k4xk27_enhancerSet.bed
+
+
+
+###IDENTIFY ENHANCERS IN INDIVIDUAL H3K27 AND H3K4 PEAKSETS
+
+##Export GRange peaksets from ChIP-Seq Diffbind in R, convert to .bed format in Excel
+allK27granges.bed
+allK4granges.bed
+
+##Intersect with active enhancer list to obtain peak IDs for ChIP-seq enhancer intervals. Make sure peak IDs carry forward with intersect
+bedtools intersect -a allK27granges.bed-b k4xk27_enhancerSet.bed -wa > K27Enhancers.bed
+bedtools intersect -a allK4granges.bed -b k4xk27_enhancerSet.bed -wa > K4Enhancers.bed
+
+
+
+###IDENTIFY ENHANCERS IN GENOTYPIC DIFFERENTIAL PEAK ANALYSIS GROUPS
+#Use the differential peak analysis reports generated in the Diffbind/DESeq2 workflow. Pull out peak names and GRanges to make .bed files in excel
+#Note: Cpt2 vs DKO comparisons are Class A, Class B, and Class C enhancers in Fig 7
+#significance cutoff is log2FoldChange >= |1|, pad < 0.05)
+
+#Intersect differential peaks with enhancer set (format: cptwt_upk27 = Cpt2 > WT, H3K27)
+bedtools intersect -a cptwt_upk27.bed -b k4xk27_enhancerSet.bed -wa > cptwt_upk27Enhancers.bed
+bedtools intersect -a cptwt_downk27.bed -b k4xk27_enhancerSet.bed -wa > cptwt_downk27Enhancers.bed
+bedtools intersect -a cptwt_nck27.bed -b k4xk27_enhancerSet.bed -wa > cptwt_nck27EEnhancers.bed
+
+bedtools intersect -a pparwt_upk27.bed -b k4xk27_enhancerSet.bed -wa > pparwt_upk27Enhancers.bed
+bedtools intersect -a pparwt_downk27.bed -b k4xk27_enhancerSet.bed -wa > pparwt_downk27Enhancers.bed
+bedtools intersect -a pparwt_nck27.bed -b k4xk27_enhancerSet.bed -wa > pparwt_nck27Enhancers.bed
+
+bedtools intersect -a cptdko_upk27.bed -b k4xk27_enhancerSet.bed -wa > cptdko_upk27Enhancers.bed #Class A
+bedtools intersect -a cptdko_downk27.bed -b k4xk27_enhancerSet.bed -wa > cptdko_downk27Enhancers.bed #Class B
+bedtools intersect -a cptdko_nck27.bed -b k4xk27_enhancerSet.bed -wa > cptdko_ncEnhancers.bed #Class C
+
+bedtools intersect -a cptwt_upk4.bed -b k4xk27_enhancerSet.bed -wa > cptwt_upk4Enhancers.bed
+bedtools intersect -a cptwt_downk4.bed -b k4xk27_enhancerSet.bed -wa > cptwt_downk4Enhancers.bed
+bedtools intersect -a cptwt_nck4.bed -b k4xk27_enhancerSet.bed -wa > cptwt_nck4Enhancers.bed
+
+bedtools intersect -a pparwt_upk4.bed -b k4xk27_enhancerSet.bed -wa > pparwt_upk4Enhancers.bed
+bedtools intersect -a pparwt_downk4.bed -b k4xk27_enhancerSet.bed -wa > pparwt_downk4Enhancers.bed
+bedtools intersect -a pparwt_nck4.bed -b k4xk27_enhancerSet.bed -wa > pparwt_nck4Enhancers.bed
+
+bedtools intersect -a cptdko_upk4.bed -b k4xk27_enhancerSet.bed -wa > cptdko_upk4Enhancers.bed
+bedtools intersect -a cptdko_downk4.bed -b k4xk27_enhancerSet.bed -wa > cptdko_downk4Enhancers.bed
+bedtools intersect -a cptdko_nck4.bed -b k4xk27_enhancerSet.bed -wa > cptdko_nck4Enhancers.bed
+
+
+
+###IDENTIFY PPARA CHIP SITES IN ENHANCER SET
+#use PPARA ChIP-seq from fasted mouse liver, GSE118788
+#also identify PPARA promoter sites for pie charts in Fig 7
+
+#Create .bed for Ppara site occupancy at enhancers
+bedtools intersect -a GSE118788_PPARa-Fast.bed -b allK27Enhancers.bed -wa > allK27Enhancers_PparSites.bed
+bedtools intersect -a GSE118788_PPARa-Fast.bed -b all4Enhancers.bed -wa > allK4Enhancers_PparSites.bed
+
+#Create .bed for Ppara site occupancy at promoters
+bedtools intersect -a allK27peakCoordinates.bed -b mm10_definedPromoters.bed -wa > allK27Promoters.bed
+bedtools intersect -a allK4peakCoordinates.bed -b mm10_definedPromoters.bed -wa > all4Promoters.bed
+
+bedtools intersect -a GSE118788_PPARa-Fast.bed -b allK27Promoters.bed -wa > allK27Promoters_PparSites.bed
+bedtools intersect -a GSE118788_PPARa-Fast.bed -b all4Promoters.bed -wa > allK4Promoters_PparSites.bed
+
+
+##Identify Ppara sites in enhancers and promoters in differential peak analysis
+bedtools intersect -a cptdko_upk27.bed -b GSE118788_PPARa-Fast.bed -wa > cptdko_upk27_ppar.bed
+bedtools intersect -a cptdko_downk27.bed -b GSE118788_PPARa-Fast.bed -wa > cptdko_downk27_ppar.bed
+bedtools intersect -a cptdko_nck27.bed -b GSE118788_PPARa-Fast.bed -wa > cptdko_nck27_ppar.bed
+
+bedtools intersect -a cptdko_upk27.bed -b GSE118788_PPARa-Fast.bed -v > cptdko_upk27_noppar.bed
+bedtools intersect -a cptdko_downk27.bed -b GSE118788_PPARa-Fast.bed -v > cptdko_downk27_noppar.bed
+bedtools intersect -a cptdko_nck27.bed -b GSE118788_PPARa-Fast.bed -v > cptdko_nck27_noppar.bed
+
+bedtools intersect -a cptdko_upk27Enhancers.bed -b GSE118788_PPARa-Fast.bed -v > dkocpt_downk27Enhancers_noppar.bed
+bedtools intersect -a cptdko_downk27Enhancers.bed -b GSE118788_PPARa-Fast.bed -v > dkocpt_upk27Enhancers_noppar.bed
+bedtools intersect -a cptdko_nck27Enhancers.bed -b GSE118788_PPARa-Fast.bed -v > dkocpt_nck27Enhancers_noppar.bed
+
+bedtools intersect -a cptdko_upk27Promoters.bed -b GSE118788_PPARa-Fast.bed -v > dkocpt_downk27Promoters_noppar.bed
+bedtools intersect -a cptdko_downk27Promoters.bed -b GSE118788_PPARa-Fast.bed -v > dkocpt_upk27Promoters_noppar.bed
+bedtools intersect -a cptdko_nck27Promoters.bed -b GSE118788_PPARa-Fast.bed -v > dkocpt_nck27Promoters_noppar.bed
+
+
+
+###QUANTIFY ENHANCER TAG COUNTS
+#Convert enhancer interval .bed file to .csv for R (adding headers), then import into R
+#Visualize in GraphPad Prism
+
+##Tag counts for all active enhancers in a ChIP peak set
+K27Enhancers <-  read.csv("K27Enhancers.csv”, header=TRUE)
+K4Enhancers <-  read.csv("K4Enhancers.csv”, header=TRUE)
+
+#use peak values (assayCounts) from H3K27ac and H3K4me1 Diffbind/DESeq2 output
+k27enhancers <- left_join(K27Enhancers, assayCounts)
+k4enhancers <- left_join(K4Enhancers, assayCountsk4)
+
+write.csv(k27enhancers, file="k27enhancersCounts.csv")
+write.csv(k4enhancers, file="k4enhancerCounts.csv")
+
+
+##H3K4 and H3K27ac tag density over Ppara ChIP sites in active enhancers
+allK27Enhancers_PparSites <- read.csv(“allK27Enhancers_PparSites.csv”, header=TRUE)
+allK4Enhancers_PparSites <- read.csv(“allK4Enhancers_PparSites.csv”, header=TRUE)
+
+allK27Enhancers_PparSites_density <- left_join(allK27Enhancers_PparSites, assayCounts)
+all4Enhancers_PparSites_density <- left_join(allK4Enhancers_PparSites, assayCountsk4)
+
+write.csv(allK27Enhancers_PparSites_density, file="allK27Enhancers_PparSites_density.csv”)
+write.csv(all4Enhancers_PparSites_density, file="all4Enhancers_PparSites_density.csv”)
+
+
+##Tag counts for active enhancers in differential peak analysis (Class A, Class B, Class C)
+cptdko_upk27Enhancers <- read.csv(“cptdko_upk27Enhancers.csv”, header=TRUE)
+cptdko_upk27Enhancers <- read.csv(“cptdko_downk27Enhancers.csv”, header=TRUE)
+cptdko_upk27Enhancers <- read.csv(“cptdko_ncEnhancers.csv”, header=TRUE)
+
+classA <- left_join(cptdko_upk27Enhancers, assayCounts)
+classB <- left_join(cptdko_upk27Enhancers, assayCounts)
+classC <- left_join(cptdko_upk27Enhancers, assayCounts)
+
+write.csv(classA, file="classA_tagCount.csv)
+write.csv(classB, file="classA_tagCount.csv")
+write.csv(classC, file="classA_tagCount.csv")
+
+
+
+###HOMER MOTIF ANALYSIS AND AGGREGATION PLOTS
+
+##Motif analysis for all active enhancers
+findMotifsGenome.pl k4xk27_enhancerSet.bed mm10 allEnhancers_motif/ -size 500
+
+##Aggregation plots
+#Use tag directories generated in the ATAC-seq and ChIP-seq workflows and the .bed peak files generated above
+#Visualize in GraphPad Prism
+
+#ATAC tag count over all active enhancers
+annotatePeaks.pl k4xk27_enhancerSet.bed mm10 -size 10000 -hist 10 -d WT_ATAC_tagDirectory/ CPT2_ATAC_tagDirectory/ PPARA_ATAC_tagDirectory/ DKO_ATAC_tagDirectory/ -norm 38307146
+
+#ATAC tag count over over Ppara ChIP sites in active enhancers
+annotatePeaks.pl allEnhancers_PparSites.bed mm10 -size 2000 -hist 10 -d WT_ATAC_tagDirectory/ CPT2_ATAC_tagDirectory/ PPARA_ATAC_tagDirectory/ DKO_ATAC_tagDirectory/ -norm 38307146 > allEnhancers_PparSitesDensityATAC.txt
+
+#H3K4 and H3K27ac tag count over Ppara ChIP sites in active enhancers
+annotatePeaks.pl allK4Enhancers_PparSites.bed mm10 -size 2000 -hist 10 -d WT_H3K4_tagDirectory/ CPT2_H3K4_tagDirectory/ PPARA_H3K4_tagDirectory/ DKO_H3K4_tagDirectory/ -norm 25038913 > allK4Enhancers_PparSitesDensity.txt
+annotatePeaks.pl allK27Enhancers_PparSites.bed mm10 -size 2000 -hist 10 -d WT_H3K27_tagDirectory/ CPT2_H3K27_tagDirectory/ PPARA_H3K27_tagDirectory/ DKO_H3K27_tagDirectory/ -norm 22273824 > allK27Enhancers_PparSitesDensity.txt
+
+#H3K4 and H3K27 tag count over Ppara ChIP sites in active enhancers, differential peak analysis PparaKO < WT
+annotatePeaks.pl pparwt_downk4Enhancers_ppar.bed mm10 -size 2000 -hist 10 -d WT_H3K4_tagDirectory/ CPT2_H3K4_tagDirectory/ PPARA_H3K4_tagDirectory/ DKO_H3K4_tagDirectory/ -norm 25038913 > pparwt_downk4Enhancers_pparDensity.txt
+annotatePeaks.pl pparwt_downk27Enhancers_ppar.bed mm10 -size 2000 -hist 10 -d WT_H3K27_tagDirectory/ CPT2_H3K27_tagDirectory/ PPARA_H3K27_tagDirectory/ DKO_H3K27_tagDirectory/ -norm 22273824 > cpparwt_downk27Enhancers_pparDensity.txt
+
+#H3K4 and H3K27 tag count over Ppara ChIP sites in active enhancers, differential peak analysis Cpt2KO > WT
+annotatePeaks.pl cptwt_upk4Enhancers_ppar.bed mm10 -size 2000 -hist 10 -d WT_H3K4_tagDirectory/ CPT2_H3K4_tagDirectory/ PPARA_H3K4_tagDirectory/ DKO_H3K4_tagDirectory/ -norm 25038913 > cptwt_upk4Enhancers_pparDensity.txt
+annotatePeaks.pl cptwt_upk27Enhancers_ppar.bed mm10 -size 2000 -hist 10 -d WT_H3K27_tagDirectory/ CPT2_H3K27_tagDirectory/ PPARA_H3K27_tagDirectory/ DKO_H3K27_tagDirectory/ -norm 22273824 > cptwt_upk27Enhancers_pparDensity.txt
+
+
+
+###HEATMAP
+#Create heatmap using DeepTools
+#Use bigWig from Active Motif as input
+#Use .bed files with differential peak analysis as input
+
+##create matrix from bigWig and .bed file
+computeMatrix reference-point --referencePoint center 
+-b 5000 -a 5000 
+-R dkocpt_up27Enhancers.bed dkocpt_downk27Enhancers.bed dkocpt_nck27Enhancers.bed
+-S 09_093K_0195JHU_9548-WT_H3K27Ac_mm10_i85_uniqnorm_signal.bw 10_093L_0195JHU_9587-WT_H3K27Ac_mm10_i86_uniqnorm_signal.bw 
+11_093M_0195JHU_9588-Cpt2_H3K27Ac_mm10_i87_uniqnorm_signal.bw 12_093N_0195JHU_9589-Cpt2_H3K27Ac_mm10_i88_uniqnorm_signal.bw
+13_093O_0195JHU_6833-Ppara_H3K27Ac_mm10_i89_uniqnorm_signal.bw 14_093P_0195JHU_6834-Ppara_H3K27Ac_mm10_i90_uniqnorm_signal.bw
+15_093Q_0195JHU_6843-DKO_H3K27Ac_mm10_i91_uniqnorm_signal.bw 16_093R_0195JHU_6848-DKO_H3K27Ac_mm10_i92_uniqnorm_signal.bw
+--missingDataAsZero
+--samplesLabel k27_wt1 k27_wt2 k27_cpt1 k27_cpt2 k27_ppar1 k27_ppar2 k27_dko1 k27_dko2 
+--outFileName k27peakset_dko-cptDE_k27chipEnhancers.gz
+
+
+computeMatrix reference-point --referencePoint center 
+-b 5000 -a 5000 
+-R dkocpt_up27Enhancers.bed dkocpt_downk27Enhancers.bed dkocpt_nck27Enhancers.bed
+-S 01_093S_0195JHU_9548-WT_H3K4me1_mm10_i93_uniqnorm_signal.bw 02_093T_0195JHU_9587-WT_H3K4me1_mm10_i94_uniqnorm_signal.bw
+03_093U_0195JHU_9588-Cpt2_H3K4me1_mm10_i95_uniqnorm_signal.bw 04_093V_0195JHU_9589-Cpt2_H3K4me1_mm10_i96_uniqnorm_signal.bw
+05_093W_0195JHU_6833-Ppara_H3K4me1_mm10_i40_uniqnorm_signal.bw 06_093X_0195JHU_6834-Ppara_H3K4me1_mm10_i42_uniqnorm_signal.bw
+07_093Y_0195JHU_6843-DKO_H3K4me1_mm10_i43_uniqnorm_signal.bw 08_093Z_0195JHU_6848-DKO_H3K4me1_mm10_i44_uniqnorm_signal.bw
+--missingDataAsZero
+--samplesLabel k4_wt1 k4_wt2 k4_cpt1 k4_cpt2 k4_ppar1 k4_ppar2 k4_dko1 k4_dko2 
+--outFileName k27peakset_dko-cptDE_k4chipEnhancers.gz
+
+
+computeMatrix reference-point --referencePoint center 
+-b 5000 -a 5000 
+-R dkocpt_up27Enhancers.bed dkocpt_downk27Enhancers.bed dkocpt_nck27Enhancers.bed
+-S 1_3993JHU_441_ATAC_mm10_i15_uniqnorm_signal.bw 2_3993JHU_443_ATAC_mm10_i16_uniqnorm_signal.bw
+3_3993JHU_446_ATAC_mm10_i17_uniqnorm_signal.bw 4_3993JHU_4717_ATAC_mm10_i18_uniqnorm_signal.bw
+5_3993JHU_6834_ATAC_mm10_i10_uniqnorm_signal.bw 6_3993JHU_6833_ATAC_mm10_i11_uniqnorm_signal.bw
+7_3993JHU_6832_ATAC_mm10_i21_uniqnorm_signal.bw 8_3993JHU_6831_ATAC_mm10_i22_uniqnorm_signal.bw
+--missingDataAsZero
+--samplesLabel atac_wt1 atac_wt2 atac_cpt1 atac_cpt2 atac_ppar1 atac_ppar2 atac_dko1 atac_dko2 
+--outFileName k27peakset_dko-cptDE_atacEnhancers.gz
+
+
+##heatmaps for dko/cpt
+plotHeatmap -m k27peakset_dko-cptDE_k27chipEnhancers.gz --zMin 0 --zMax 3  --colorList 'whitesmoke,navy' --whatToShow 'heatmap and colorbar' --outFileName k27peakset_dko-cptDE_k27chipEnhancers.png --dpi 1000
+plotHeatmap -m k27peakset_dko-cptDE_k4chipEnhancers.gz --zMin 0 --zMax 3 --colorList 'whitesmoke,darkgreen' --whatToShow 'heatmap and colorbar' --outFileName k27peakset_dko-cptDE_k4chipEnhancers.png --dpi 1000
+plotHeatmap -m k27peakset_dko-cptDE_atacEnhancers.gz--zMin 0 --zMax 3 --colorList 'whitesmoke,crimson' --whatToShow 'heatmap and colorbar' --outFileName k27peakset_dko-cptDE_atacEnhancers.png --dpi 1000
+
+
+
+
+
