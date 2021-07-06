@@ -92,11 +92,11 @@ ddsATAC <- ddsATAC[ rowSums(counts(ddsATAC)) > 1, ]
 
 #call result reports
 res1 <- results(ddsATAC, contrast=c("genotype","cpt2","wt"), 
-                alpha=0.05, lfcThreshold = 1, format = "GRanges")
+                alpha=0.05, lfcThreshold = 0, format = "GRanges")
 res2 <- results(ddsATAC, contrast=c("genotype","ppar","wt"), 
-                alpha=0.05, lfcThreshold = 1, format = "GRanges")
+                alpha=0.05, lfcThreshold = 0, format = "GRanges")
 res3 <- results(ddsATAC, contrast=c("genotype","dko","wt"),
-                alpha=0.05, lfcThreshold = 1, format = "GRanges")
+                alpha=0.05, lfcThreshold = 0, format = "GRanges")
 
 #rlog transformation for downstream visualization
 atac_rlog <- rlog(ddsATAC, blind=TRUE)
